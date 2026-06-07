@@ -327,18 +327,17 @@ function signIn() {
     showToast('מצב מקומי — ללא סנכרון (יש להגדיר CLIENT_ID)');
     return;
   }
-  const client = google.accounts.oauth2.initTokenClient({
+  // Redirect flow — works on iOS Safari and all browsers
+  const redirectUri = window.location.href.split('?')[0].split('#')[0];
+  const params = new URLSearchParams({
     client_id: GOOGLE_CLIENT_ID,
+    redirect_uri: redirectUri,
+    response_type: 'token',
     scope: 'https://www.googleapis.com/auth/drive.file',
-    callback: (resp) => {
-      if (resp.error) { showToast('שגיאה בהתחברות'); return; }
-      accessToken = resp.access_token;
-      lsSave('cf_token_exp', Date.now() + (resp.expires_in * 1000));
-      showApp();
-      loadFromDrive();
-    }
+    include_granted_scopes: 'true',
+    prompt: 'consent select_account'
   });
-  client.requestAccessToken();
+  window.location.href = 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
 }
 
 function signOut() {
@@ -591,10 +590,32 @@ function deleteDebtor(id) { if (!confirm('למחוק חייב זה?')) return; d
 function deleteFixed(id) { if (!confirm('למחוק הוצאה קבועה זו?')) return; fixedExp=fixedExp.filter(x=>x.id!==id); render(); scheduleSave(); showToast('נמחק'); }
 
 // ─── INIT ─────────────────────────────────────────────────────
-// Auto-login if no real client ID configured (demo mode)
 window.addEventListener('load', () => {
-  if (GOOGLE_CLIENT_ID === 'YOUR_CLIENT_ID_HERE.apps.googleusercontent.com') {
-    // show login screen with note
+  // Parse token from URL hash after Google redirect
+  const hash = window.location.hash;
+  if (hash && hash.includes('access_token')) {
+    const params = new URLSearchParams(hash.substring(1));
+    accessToken = params.get('access_token');
+    const expiresIn = parseInt(params.get('expires_in') || '3600');
+    lsSave('cf_token_exp', Date.now() + expiresIn * 1000);
+    // Clean URL
+    history.replaceState(null, '', window.location.pathname);
+    showApp();
+    loadFromDrive();
+    return;
+  }
+
+  // Check saved token validity
+  const tokenExp = lsLoad('cf_token_exp', 0);
+  if (tokenExp && Date.now() < tokenExp - 60000) {
+    // Token might still be valid — but we can't reuse implicit tokens after redirect
+    // Show login screen
+  }
+
+  // Check for error
+  if (hash && hash.includes('error')) {
+    showToast('שגיאת התחברות — נסה שוב');
+    history.replaceState(null, '', window.location.pathname);
   }
 });
 </script>
