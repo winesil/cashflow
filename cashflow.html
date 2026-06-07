@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="תזרים">
+<meta name="theme-color" content="#0f0f0f">
+<title>תזרים</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0f0f0f; --bg2: #1a1a1a; --bg3: #252525;
+  --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.14);
+  --text: #f0f0f0; --text2: #888; --text3: #555;
+  --green: #22c77a; --green-bg: rgba(34,199,122,0.12);
+  --red: #f05252; --red-bg: rgba(240,82,82,0.12);
+  --amber: #f59e0b; --amber-bg: rgba(245,158,11,0.12);
+  --blue: #60a5fa; --blue-bg: rgba(96,165,250,0.1);
+  --safe-top: env(safe-area-inset-top, 44px);
+  --safe-bot: env(safe-area-inset-bottom, 34px);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; background: var(--bg); font-family: 'Heebo', sans-serif; color: var(--text); }
+#app { display: flex; flex-direction: column; height: 100dvh; }
+#header { padding: calc(var(--safe-top) + 8px) 20px 16px; background: var(--bg); border-bottom: 0.5px solid var(--border); flex-shrink: 0; }
+#content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: calc(var(--safe-bot) + 70px); }
+#nav { position: fixed; bottom: 0; left: 0; right: 0; height: calc(56px + var(--safe-bot)); padding-bottom: var(--safe-bot); background: rgba(15,15,15,0.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 0.5px solid var(--border); display: flex; z-index: 100; }
+.header-date { font-size: 12px; color: var(--text3); margin-bottom: 4px; letter-spacing: 0.5px; display: flex; align-items: center; justify-content: space-between; }
+.sync-btn { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 4px; font-family: 'Heebo', sans-serif; padding: 2px 6px; border-radius: 6px; }
+.sync-btn:active { background: var(--bg3); }
+.sync-btn.syncing { color: var(--blue); animation: spin 1s linear infinite; }
+.sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); }
+.sync-dot.ok { background: var(--green); }
+.sync-dot.err { background: var(--red); }
+.sync-dot.syncing { background: var(--blue); }
+@keyframes spin { to { transform: rotate(360deg); } }
+.balance-num { font-size: 38px; font-weight: 300; line-height: 1; letter-spacing: -1px; }
+.balance-num.pos { color: var(--green); } .balance-num.neg { color: var(--red); }
+.balance-label { font-size: 11px; color: var(--text3); margin-bottom: 6px; }
+.header-pills { display: flex; gap: 8px; margin-top: 14px; }
+.pill { flex: 1; background: var(--bg2); border-radius: 12px; padding: 10px 10px; border: 0.5px solid var(--border); }
+.pill-label { font-size: 9px; color: var(--text3); margin-bottom: 3px; letter-spacing: 0.3px; }
+.pill-val { font-size: 15px; font-weight: 500; }
+.pill-val.g { color: var(--green); } .pill-val.r { color: var(--red); }
+.nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; background: none; border: none; color: var(--text3); font-size: 10px; font-family: 'Heebo', sans-serif; cursor: pointer; transition: color 0.15s; }
+.nav-btn.active { color: var(--text); }
+.nav-btn svg { width: 22px; height: 22px; stroke-width: 1.5; }
+.section { display: none; padding: 16px 16px 0; }
+.section.active { display: block; }
+.action-row { display: flex; gap: 10px; margin-bottom: 20px; }
+.action-btn { flex: 1; padding: 14px; border-radius: 14px; border: 0.5px solid; font-size: 15px; font-family: 'Heebo', sans-serif; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.action-btn:active { opacity: 0.7; }
+.action-btn.income { background: var(--green-bg); border-color: rgba(34,199,122,0.3); color: var(--green); }
+.action-btn.expense { background: var(--red-bg); border-color: rgba(240,82,82,0.3); color: var(--red); }
+.card { background: var(--bg2); border-radius: 16px; border: 0.5px solid var(--border); margin-bottom: 12px; overflow: hidden; }
+.card-header { padding: 14px 16px 10px; display: flex; align-items: center; justify-content: space-between; border-bottom: 0.5px solid var(--border); }
+.card-title { font-size: 12px; font-weight: 500; color: var(--text2); letter-spacing: 0.5px; text-transform: uppercase; }
+.card-count { font-size: 11px; color: var(--text3); background: var(--bg3); padding: 3px 8px; border-radius: 20px; }
+.tx-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 0.5px solid var(--border); }
+.tx-item:last-child { border-bottom: none; }
+.tx-left { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.tx-name { font-size: 15px; font-weight: 400; color: var(--text); }
+.tx-date { font-size: 11px; color: var(--text3); }
+.tx-right { display: flex; align-items: center; gap: 10px; }
+.tx-amount { font-size: 16px; font-weight: 500; }
+.tx-amount.g { color: var(--green); } .tx-amount.r { color: var(--red); }
+.del-btn { width: 28px; height: 28px; border-radius: 8px; background: none; border: none; color: var(--text3); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.del-btn:active { background: var(--bg3); }
+.empty-state { padding: 32px 16px; text-align: center; color: var(--text3); font-size: 14px; }
+.debtor-item { padding: 14px 16px; border-bottom: 0.5px solid var(--border); }
+.debtor-item:last-child { border-bottom: none; }
+.debtor-row1 { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.debtor-name { font-size: 16px; font-weight: 500; color: var(--text); }
+.debtor-amount { font-size: 17px; font-weight: 500; color: var(--amber); }
+.debtor-row2 { display: flex; align-items: center; justify-content: space-between; }
+.debtor-meta { font-size: 12px; color: var(--text3); }
+.debtor-actions { display: flex; gap: 8px; }
+.paid-btn { background: var(--green-bg); border: 0.5px solid rgba(34,199,122,0.3); color: var(--green); border-radius: 10px; padding: 6px 14px; font-size: 13px; font-family: 'Heebo', sans-serif; font-weight: 500; cursor: pointer; }
+.paid-btn:active { opacity: 0.7; }
+.fe-item { padding: 14px 16px; border-bottom: 0.5px solid var(--border); }
+.fe-item:last-child { border-bottom: none; }
+.fe-row1 { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.fe-name { font-size: 16px; font-weight: 500; color: var(--text); }
+.fe-amount { font-size: 17px; font-weight: 500; color: var(--red); }
+.fe-row2 { display: flex; align-items: center; justify-content: space-between; }
+.fe-meta { font-size: 12px; color: var(--text3); }
+.badge { font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 20px; }
+.badge.upcoming { background: var(--amber-bg); color: var(--amber); }
+.badge.due { background: var(--red-bg); color: var(--red); }
+.badge.ok { background: var(--green-bg); color: var(--green); }
+.add-row { padding: 12px 16px; }
+.add-link { background: none; border: 1px dashed var(--border2); border-radius: 12px; width: 100%; padding: 11px; font-size: 14px; color: var(--text2); font-family: 'Heebo', sans-serif; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.add-link:active { background: var(--bg3); }
+.section-title { font-size: 22px; font-weight: 500; margin-bottom: 18px; color: var(--text); }
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; display: none; align-items: flex-end; }
+.overlay.open { display: flex; }
+.sheet { background: var(--bg2); border-radius: 24px 24px 0 0; padding: 0 0 calc(var(--safe-bot) + 16px); width: 100%; border-top: 0.5px solid var(--border); animation: slideUp 0.28s cubic-bezier(0.34,1.2,0.64,1); }
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.sheet-handle { width: 36px; height: 4px; background: var(--bg3); border-radius: 2px; margin: 12px auto 20px; }
+.sheet-title { font-size: 18px; font-weight: 500; text-align: center; padding: 0 20px 20px; color: var(--text); }
+.sheet-body { padding: 0 20px; }
+.field { margin-bottom: 14px; }
+.field label { font-size: 12px; color: var(--text3); letter-spacing: 0.3px; margin-bottom: 6px; display: block; }
+.field input, .field select { width: 100%; padding: 14px 16px; background: var(--bg3); border: 0.5px solid var(--border2); border-radius: 12px; color: var(--text); font-size: 16px; font-family: 'Heebo', sans-serif; -webkit-appearance: none; appearance: none; outline: none; }
+.field input:focus { border-color: var(--blue); }
+.sheet-footer { padding: 16px 20px 0; display: flex; gap: 10px; }
+.btn-cancel { flex: 1; padding: 14px; background: var(--bg3); border: none; border-radius: 14px; color: var(--text2); font-size: 16px; font-family: 'Heebo', sans-serif; cursor: pointer; }
+.btn-save { flex: 2; padding: 14px; background: var(--text); border: none; border-radius: 14px; color: var(--bg); font-size: 16px; font-weight: 600; font-family: 'Heebo', sans-serif; cursor: pointer; }
+.btn-save:active { opacity: 0.85; }
+.toast { position: fixed; top: calc(var(--safe-top) + 60px); left: 50%; transform: translateX(-50%); background: var(--bg3); border: 0.5px solid var(--border2); color: var(--text); padding: 10px 20px; border-radius: 20px; font-size: 14px; z-index: 300; opacity: 0; transition: opacity 0.2s; pointer-events: none; white-space: nowrap; }
+.toast.show { opacity: 1; }
+
+/* Google login screen */
+#login-screen { position: fixed; inset: 0; background: var(--bg); z-index: 400; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 32px; text-align: center; }
+.login-logo { font-size: 48px; margin-bottom: 24px; }
+.login-title { font-size: 24px; font-weight: 500; margin-bottom: 8px; color: var(--text); }
+.login-sub { font-size: 15px; color: var(--text3); margin-bottom: 40px; line-height: 1.6; }
+.google-btn { display: flex; align-items: center; justify-content: center; gap: 12px; background: var(--bg2); border: 0.5px solid var(--border2); border-radius: 16px; padding: 16px 28px; font-size: 16px; font-family: 'Heebo', sans-serif; font-weight: 500; color: var(--text); cursor: pointer; width: 100%; max-width: 320px; }
+.google-btn:active { opacity: 0.8; }
+.google-icon { width: 22px; height: 22px; }
+.login-note { font-size: 12px; color: var(--text3); margin-top: 20px; line-height: 1.5; }
+
+/* Sync status bar */
+.sync-bar { display: flex; align-items: center; gap: 6px; }
+</style>
+</head>
+<body>
+
+<!-- Login screen -->
+<div id="login-screen">
+  <div class="login-logo">💰</div>
+  <div class="login-title">תזרים העסק</div>
+  <div class="login-sub">התחבר עם Google כדי לסנכרן<br>את הנתונים בין האייפון והמחשב</div>
+  <button class="google-btn" onclick="signIn()">
+    <svg class="google-icon" viewBox="0 0 24 24">
+      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+    </svg>
+    התחבר עם Google
+  </button>
+  <div class="login-note">הנתונים נשמרים בלעדית ב-Google Drive שלך.<br>לא נשמר שום מידע אצלנו.</div>
+</div>
+
+<div id="app" style="display:none">
+  <div id="header">
+    <div class="header-date">
+      <span id="cur-date"></span>
+      <div class="sync-bar">
+        <div class="sync-dot" id="sync-dot"></div>
+        <button class="sync-btn" id="sync-btn" onclick="manualSync()">סנכרן</button>
+        <button class="sync-btn" onclick="signOut()" style="color:var(--red)">יציאה</button>
+      </div>
+    </div>
+    <div class="balance-label">יתרה עדכנית</div>
+    <div class="balance-num" id="main-bal">₪0</div>
+    <div class="header-pills">
+      <div class="pill">
+        <div class="pill-label">הכנסות החודש</div>
+        <div class="pill-val g" id="m-inc">₪0</div>
+      </div>
+      <div class="pill">
+        <div class="pill-label">הוצאות החודש</div>
+        <div class="pill-val r" id="m-exp">₪0</div>
+      </div>
+      <div class="pill" id="diff-pill">
+        <div class="pill-label">הפרש</div>
+        <div class="pill-val" id="m-diff">₪0</div>
+      </div>
+      <div class="pill">
+        <div class="pill-label">חייבים</div>
+        <div class="pill-val" style="color:var(--amber)" id="total-debt">₪0</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="content">
+    <div id="tab-overview" class="section active">
+      <div class="action-row" style="margin-top:16px">
+        <button class="action-btn income" onclick="openModal('income')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7-7 7 7"/></svg>
+          כניסת כספים
+        </button>
+        <button class="action-btn expense" onclick="openModal('expense')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5M5 12l7 7 7-7"/></svg>
+          הוצאת כספים
+        </button>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title" style="color:var(--green)">הכנסות</span>
+          <span class="card-count" id="inc-count">0</span>
+        </div>
+        <div id="income-list"><div class="empty-state">אין הכנסות עדיין</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title" style="color:var(--red)">הוצאות</span>
+          <span class="card-count" id="exp-count">0</span>
+        </div>
+        <div id="expense-list"><div class="empty-state">אין הוצאות עדיין</div></div>
+      </div>
+    </div>
+
+    <div id="tab-debtors" class="section">
+      <div style="padding-top:16px">
+        <div class="section-title">רשימת חייבים</div>
+        <div class="card">
+          <div id="debtors-list"><div class="empty-state">אין חייבים ברשימה</div></div>
+          <div class="add-row">
+            <button class="add-link" onclick="openModal('debtor')">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+              הוסף חייב
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="tab-fixed" class="section">
+      <div style="padding-top:16px">
+        <div class="section-title">הוצאות קבועות</div>
+        <div class="card">
+          <div id="fixed-list"><div class="empty-state">אין הוצאות קבועות</div></div>
+          <div class="add-row">
+            <button class="add-link" onclick="openModal('fixed')">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+              הוסף הוצאה קבועה
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <nav id="nav">
+    <button class="nav-btn active" id="nav-overview" onclick="switchTab('overview')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      סקירה
+    </button>
+    <button class="nav-btn" id="nav-debtors" onclick="switchTab('debtors')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="9" cy="7" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6"/><circle cx="17" cy="11" r="3"/><path d="M13 20c0-2.8 1.8-5 4-5s4 2.2 4 5"/></svg>
+      חייבים
+    </button>
+    <button class="nav-btn" id="nav-fixed" onclick="switchTab('fixed')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+      קבועות
+    </button>
+  </nav>
+</div>
+
+<div class="overlay" id="overlay" onclick="closeModalOutside(event)">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="sheet-title">כניסת כספים</div>
+    <div class="sheet-body">
+      <div class="field"><label>תיאור</label><input type="text" id="f-desc" autocomplete="off" autocorrect="off"></div>
+      <div class="field"><label>סכום (₪)</label><input type="number" id="f-amount" inputmode="decimal" min="0" step="0.01"></div>
+      <div class="field" id="f-date-field"><label>תאריך</label><input type="date" id="f-date"></div>
+      <div class="field" id="f-day-field" style="display:none"><label>יום בחודש לתשלום</label><input type="number" id="f-day" inputmode="numeric" min="1" max="28" placeholder="לדוגמה: 10"></div>
+      <div class="field" id="f-note-field" style="display:none"><label>הערה (אופציונלי)</label><input type="text" id="f-note" autocomplete="off"></div>
+    </div>
+    <div class="sheet-footer">
+      <button class="btn-cancel" onclick="closeModal()">ביטול</button>
+      <button class="btn-save" onclick="submitModal()">שמור</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<!-- Google Identity Services -->
+<script src="https://accounts.google.com/gsi/client" async></script>
+<script>
+// ─── CONFIGURATION ─────────────────────────────────────────────
+// כדי שהסנכרון יעבוד צריך להגדיר Google OAuth Client ID.
+// הוראות: https://console.cloud.google.com → Create Project → APIs & Services
+// → Credentials → Create OAuth 2.0 Client ID → Web application
+// → Authorized JavaScript origins: הכנס את הכתובת שבה תפעיל את הקובץ
+// אחרי שיצרת, החלף את הערך כאן:
+const GOOGLE_CLIENT_ID = 'YOUR_CLIENT_ID_HERE.apps.googleusercontent.com';
+const DRIVE_FILE_NAME = 'cashflow_data.json';
+// ───────────────────────────────────────────────────────────────
+
+const MONTHS = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+
+let accessToken = null;
+let driveFileId = null;
+let syncTimer = null;
+let pendingSync = false;
+
+let incomes = [];
+let expenses = [];
+let debtors = [];
+let fixedExp = [];
+let nextId = 1;
+let modalType = 'income';
+
+// ─── LOCAL STORAGE fallback ────────────────────────────────────
+function lsLoad(k, def) { try { return JSON.parse(localStorage.getItem(k)) || def; } catch { return def; } }
+function lsSave(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+
+function loadLocal() {
+  incomes  = lsLoad('cf_inc', []);
+  expenses = lsLoad('cf_exp', []);
+  debtors  = lsLoad('cf_dbt', []);
+  fixedExp = lsLoad('cf_fix', []);
+  nextId   = lsLoad('cf_nid', 1);
+}
+function saveLocal() {
+  lsSave('cf_inc', incomes); lsSave('cf_exp', expenses);
+  lsSave('cf_dbt', debtors); lsSave('cf_fix', fixedExp);
+  lsSave('cf_nid', nextId);
+}
+
+// ─── GOOGLE SIGN IN ───────────────────────────────────────────
+function signIn() {
+  if (GOOGLE_CLIENT_ID === 'YOUR_CLIENT_ID_HERE.apps.googleusercontent.com') {
+    // Demo mode without real OAuth — use local storage only
+    showApp();
+    loadLocal();
+    render();
+    setSyncStatus('local');
+    showToast('מצב מקומי — ללא סנכרון (יש להגדיר CLIENT_ID)');
+    return;
+  }
+  const client = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: 'https://www.googleapis.com/auth/drive.file',
+    callback: (resp) => {
+      if (resp.error) { showToast('שגיאה בהתחברות'); return; }
+      accessToken = resp.access_token;
+      lsSave('cf_token_exp', Date.now() + (resp.expires_in * 1000));
+      showApp();
+      loadFromDrive();
+    }
+  });
+  client.requestAccessToken();
+}
+
+function signOut() {
+  if (confirm('להתנתק?')) {
+    accessToken = null; driveFileId = null;
+    localStorage.removeItem('cf_token_exp');
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('login-screen').style.display = 'flex';
+  }
+}
+
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+}
+
+// ─── GOOGLE DRIVE SYNC ────────────────────────────────────────
+function setSyncStatus(state) {
+  const dot = document.getElementById('sync-dot');
+  dot.className = 'sync-dot';
+  if (state === 'ok') dot.classList.add('ok');
+  else if (state === 'err') dot.classList.add('err');
+  else if (state === 'syncing') dot.classList.add('syncing');
+  // 'local' = default gray
+}
+
+async function findDriveFile() {
+  const res = await fetch(
+    `https://www.googleapis.com/drive/v3/files?q=name='${DRIVE_FILE_NAME}'+and+trashed=false&spaces=drive&fields=files(id)`,
+    { headers: { Authorization: 'Bearer ' + accessToken } }
+  );
+  const data = await res.json();
+  return data.files && data.files.length ? data.files[0].id : null;
+}
+
+async function loadFromDrive() {
+  if (!accessToken) { loadLocal(); render(); return; }
+  setSyncStatus('syncing');
+  try {
+    driveFileId = await findDriveFile();
+    if (driveFileId) {
+      const res = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`,
+        { headers: { Authorization: 'Bearer ' + accessToken } }
+      );
+      const data = await res.json();
+      incomes  = data.incomes  || [];
+      expenses = data.expenses || [];
+      debtors  = data.debtors  || [];
+      fixedExp = data.fixedExp || [];
+      nextId   = data.nextId   || 1;
+      saveLocal();
+      setSyncStatus('ok');
+      showToast('נטען מ-Google Drive ✓');
+    } else {
+      loadLocal();
+      setSyncStatus('ok');
+    }
+    render();
+  } catch(e) {
+    loadLocal(); render();
+    setSyncStatus('err');
+    showToast('שגיאת סנכרון — עובד מקומית');
+  }
+}
+
+async function saveToDrive() {
+  if (!accessToken) { saveLocal(); return; }
+  setSyncStatus('syncing');
+  const body = JSON.stringify({ incomes, expenses, debtors, fixedExp, nextId, lastUpdated: new Date().toISOString() });
+  const blob = new Blob([body], { type: 'application/json' });
+  try {
+    if (driveFileId) {
+      await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`, {
+        method: 'PATCH',
+        headers: { Authorization: 'Bearer ' + accessToken, 'Content-Type': 'application/json' },
+        body: blob
+      });
+    } else {
+      const meta = { name: DRIVE_FILE_NAME, mimeType: 'application/json' };
+      const form = new FormData();
+      form.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));
+      form.append('file', blob);
+      const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+        method: 'POST', headers: { Authorization: 'Bearer ' + accessToken }, body: form
+      });
+      const d = await res.json();
+      driveFileId = d.id;
+    }
+    saveLocal();
+    setSyncStatus('ok');
+  } catch(e) {
+    saveLocal();
+    setSyncStatus('err');
+  }
+}
+
+function scheduleSave() {
+  saveLocal();
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => saveToDrive(), 1500);
+}
+
+function manualSync() {
+  if (accessToken) { loadFromDrive(); }
+  else { showToast('לא מחובר ל-Google'); }
+}
+
+// ─── UTILITIES ────────────────────────────────────────────────
+function fmtDate(s) { const d = new Date(s); return d.getDate()+'/'+(d.getMonth()+1)+'/'+d.getFullYear(); }
+function todayISO() { const d=new Date(); return d.getFullYear()+'-'+(d.getMonth()+1+'').padStart(2,'0')+'-'+(d.getDate()+'').padStart(2,'0'); }
+function fmtMoney(n) { return '₪'+Number(n).toLocaleString('he-IL',{minimumFractionDigits:0,maximumFractionDigits:0}); }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+// ─── RENDER ───────────────────────────────────────────────────
+function render() {
+  const now = new Date();
+  document.getElementById('cur-date').textContent = now.getDate()+' '+MONTHS[now.getMonth()]+' '+now.getFullYear();
+  const totalInc = incomes.reduce((s,x)=>s+x.amount,0);
+  const totalExp = expenses.reduce((s,x)=>s+x.amount,0);
+  const bal = totalInc - totalExp;
+  const balEl = document.getElementById('main-bal');
+  balEl.textContent = fmtMoney(bal);
+  balEl.className = 'balance-num '+(bal>=0?'pos':'neg');
+  const mInc = incomes.filter(x=>{ const d=new Date(x.rawDate); return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear(); }).reduce((s,x)=>s+x.amount,0);
+  const mExp = expenses.filter(x=>{ const d=new Date(x.rawDate); return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear(); }).reduce((s,x)=>s+x.amount,0);
+  document.getElementById('m-inc').textContent = fmtMoney(mInc);
+  document.getElementById('m-exp').textContent = fmtMoney(mExp);
+  document.getElementById('total-debt').textContent = fmtMoney(debtors.reduce((s,x)=>s+x.amount,0));
+  const diff = mInc - mExp;
+  const diffEl = document.getElementById('m-diff');
+  diffEl.textContent = (diff>=0?'+':'')+fmtMoney(diff);
+  diffEl.style.color = diff>=0?'var(--green)':'var(--red)';
+  document.getElementById('diff-pill').style.borderColor = diff>=0?'rgba(34,199,122,0.25)':'rgba(240,82,82,0.25)';
+  renderTxList('income-list','inc-count',incomes,'g','+');
+  renderTxList('expense-list','exp-count',expenses,'r','-');
+  renderDebtors(); renderFixed();
+}
+
+function renderTxList(listId, countId, arr, cls, sign) {
+  document.getElementById(countId).textContent = arr.length;
+  const el = document.getElementById(listId);
+  if (!arr.length) { el.innerHTML = '<div class="empty-state">אין רשומות עדיין</div>'; return; }
+  el.innerHTML = [...arr].reverse().map(tx => `
+    <div class="tx-item">
+      <div class="tx-left"><div class="tx-name">${esc(tx.desc)}</div><div class="tx-date">${tx.date}</div></div>
+      <div class="tx-right">
+        <span class="tx-amount ${cls}">${sign}${fmtMoney(tx.amount)}</span>
+        <button class="del-btn" onclick="deleteItem('${cls==='g'?'income':'expense'}',${tx.id})">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+        </button>
+      </div>
+    </div>`).join('');
+}
+
+function renderDebtors() {
+  const el = document.getElementById('debtors-list');
+  if (!debtors.length) { el.innerHTML = '<div class="empty-state">אין חייבים ברשימה</div>'; return; }
+  el.innerHTML = debtors.map(d => `
+    <div class="debtor-item">
+      <div class="debtor-row1"><span class="debtor-name">${esc(d.name)}</span><span class="debtor-amount">${fmtMoney(d.amount)}</span></div>
+      <div class="debtor-row2">
+        <span class="debtor-meta">${d.note?esc(d.note)+' · ':''}מ-${d.date}</span>
+        <div class="debtor-actions">
+          <button class="paid-btn" onclick="collectDebtor(${d.id})">✓ שולם</button>
+          <button class="del-btn" onclick="deleteDebtor(${d.id})"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function renderFixed() {
+  const el = document.getElementById('fixed-list');
+  if (!fixedExp.length) { el.innerHTML = '<div class="empty-state">אין הוצאות קבועות</div>'; return; }
+  const today = new Date().getDate();
+  el.innerHTML = fixedExp.map(f => {
+    const diff = f.day - today;
+    const badge = diff<0 ? `<span class="badge ok">שולם החודש</span>` : diff<=3 ? `<span class="badge due">בעוד ${diff} ימים</span>` : `<span class="badge upcoming">יום ${f.day}</span>`;
+    return `<div class="fe-item">
+      <div class="fe-row1"><span class="fe-name">${esc(f.name)}</span><span class="fe-amount">-${fmtMoney(f.amount)}</span></div>
+      <div class="fe-row2">
+        <span class="fe-meta">${f.note?esc(f.note)+' · ':''}תאריך: ${f.day} לחודש</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          ${badge}
+          <button class="del-btn" onclick="deleteFixed(${f.id})"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ─── TABS / MODAL ─────────────────────────────────────────────
+function switchTab(name) {
+  ['overview','debtors','fixed'].forEach(t => {
+    document.getElementById('tab-'+t).classList.toggle('active', t===name);
+    document.getElementById('nav-'+t).classList.toggle('active', t===name);
+  });
+}
+
+function openModal(type) {
+  modalType = type;
+  const titles = { income:'כניסת כספים', expense:'הוצאת כספים', debtor:'הוסף חייב', fixed:'הוצאה קבועה' };
+  document.getElementById('sheet-title').textContent = titles[type];
+  document.getElementById('f-desc').value=''; document.getElementById('f-amount').value='';
+  document.getElementById('f-note').value=''; document.getElementById('f-day').value='';
+  document.getElementById('f-date').value=todayISO();
+  document.getElementById('f-date-field').style.display = type==='fixed'?'none':'block';
+  document.getElementById('f-day-field').style.display = type==='fixed'?'block':'none';
+  document.getElementById('f-note-field').style.display = (type==='debtor'||type==='fixed')?'block':'none';
+  document.getElementById('f-desc').placeholder = type==='debtor'?'שם החייב':type==='fixed'?'שם ההוצאה':'תיאור הפעולה';
+  document.getElementById('overlay').classList.add('open');
+  setTimeout(() => document.getElementById('f-desc').focus(), 320);
+}
+
+function closeModal() { document.getElementById('overlay').classList.remove('open'); }
+function closeModalOutside(e) { if (e.target===document.getElementById('overlay')) closeModal(); }
+
+function submitModal() {
+  const desc = document.getElementById('f-desc').value.trim();
+  const amount = parseFloat(document.getElementById('f-amount').value);
+  const date = document.getElementById('f-date').value;
+  if (!desc || !amount || amount<=0) { showToast('נא למלא תיאור וסכום'); return; }
+  if (modalType==='income') incomes.push({ id:nextId++, desc, amount, date:fmtDate(date), rawDate:date });
+  else if (modalType==='expense') expenses.push({ id:nextId++, desc, amount, date:fmtDate(date), rawDate:date });
+  else if (modalType==='debtor') debtors.push({ id:nextId++, name:desc, amount, note:document.getElementById('f-note').value.trim(), date:fmtDate(date) });
+  else if (modalType==='fixed') fixedExp.push({ id:nextId++, name:desc, amount, day:parseInt(document.getElementById('f-day').value)||1, note:document.getElementById('f-note').value.trim() });
+  closeModal(); render(); scheduleSave(); showToast('נשמר ✓');
+}
+
+function collectDebtor(id) {
+  const d = debtors.find(x=>x.id===id);
+  if (!d||!confirm('לסמן תשלום מ-'+d.name+' ('+fmtMoney(d.amount)+') ולהעביר להכנסות?')) return;
+  incomes.push({ id:nextId++, desc:'גביית חוב — '+d.name, amount:d.amount, date:fmtDate(todayISO()), rawDate:todayISO() });
+  debtors = debtors.filter(x=>x.id!==id);
+  render(); scheduleSave(); showToast('הועבר להכנסות ✓');
+}
+
+function deleteItem(type, id) {
+  if (!confirm('למחוק רשומה זו?')) return;
+  if (type==='income') incomes=incomes.filter(x=>x.id!==id);
+  else expenses=expenses.filter(x=>x.id!==id);
+  render(); scheduleSave(); showToast('נמחק');
+}
+function deleteDebtor(id) { if (!confirm('למחוק חייב זה?')) return; debtors=debtors.filter(x=>x.id!==id); render(); scheduleSave(); showToast('נמחק'); }
+function deleteFixed(id) { if (!confirm('למחוק הוצאה קבועה זו?')) return; fixedExp=fixedExp.filter(x=>x.id!==id); render(); scheduleSave(); showToast('נמחק'); }
+
+// ─── INIT ─────────────────────────────────────────────────────
+// Auto-login if no real client ID configured (demo mode)
+window.addEventListener('load', () => {
+  if (GOOGLE_CLIENT_ID === 'YOUR_CLIENT_ID_HERE.apps.googleusercontent.com') {
+    // show login screen with note
+  }
+});
+</script>
+</body>
+</html>
