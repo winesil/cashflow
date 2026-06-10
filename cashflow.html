@@ -441,10 +441,7 @@ function scheduleSave() {
   syncTimer = setTimeout(() => saveToDrive(), 1500);
 }
 
-function manualSync() {
-  if (accessToken) { loadFromDrive(); }
-  else { showToast('לא מחובר ל-Google'); }
-}
+// manualSync defined in INIT section
 
 // ─── UTILITIES ────────────────────────────────────────────────
 function fmtDate(s) { const d = new Date(s); return d.getDate()+'/'+(d.getMonth()+1)+'/'+d.getFullYear(); }
@@ -591,33 +588,64 @@ function deleteFixed(id) { if (!confirm('למחוק הוצאה קבועה זו?'
 
 // ─── INIT ─────────────────────────────────────────────────────
 window.addEventListener('load', () => {
-  // Parse token from URL hash after Google redirect
   const hash = window.location.hash;
+
+  // 1. חזרה מ-Google עם token חדש
   if (hash && hash.includes('access_token')) {
     const params = new URLSearchParams(hash.substring(1));
     accessToken = params.get('access_token');
     const expiresIn = parseInt(params.get('expires_in') || '3600');
     lsSave('cf_token_exp', Date.now() + expiresIn * 1000);
-    // Clean URL
+    lsSave('cf_authed', '1');
     history.replaceState(null, '', window.location.pathname);
-    showApp();
-    loadFromDrive();
+    loadLocal(); render(); showApp();
+    loadFromDrive(); // סנכרן עם Drive ברקע
     return;
   }
 
-  // Check saved token validity
-  const tokenExp = lsLoad('cf_token_exp', 0);
-  if (tokenExp && Date.now() < tokenExp - 60000) {
-    // Token might still be valid — but we can't reuse implicit tokens after redirect
-    // Show login screen
-  }
-
-  // Check for error
+  // 2. שגיאה מ-Google
   if (hash && hash.includes('error')) {
-    showToast('שגיאת התחברות — נסה שוב');
     history.replaceState(null, '', window.location.pathname);
   }
+
+  // 3. המשתמש כבר התחבר בעבר — פתח מיד ללא שאלות
+  const everAuthed = lsLoad('cf_authed', null);
+  if (everAuthed) {
+    loadLocal(); render(); showApp();
+    setSyncStatus('local');
+    // נסה לסנכרן בשקט אם יש token תקף
+    const tokenExp = lsLoad('cf_token_exp', 0);
+    if (accessToken || (tokenExp && Date.now() < tokenExp - 60000)) {
+      loadFromDrive();
+    } else {
+      // Token פג — סנכרן בפעם הבאה שהמשתמש ילחץ "סנכרן"
+      setSyncStatus('local');
+    }
+    return;
+  }
+
+  // 4. כניסה ראשונה — הצג מסך התחברות
 });
+
+// כפתור סנכרן — אם token פג, שלח להתחבר מחדש
+function manualSync() {
+  const tokenExp = lsLoad('cf_token_exp', 0);
+  if (accessToken || (tokenExp && Date.now() < tokenExp - 60000)) {
+    loadFromDrive();
+  } else {
+    // Token פג — רענן בשקט
+    const redirectUri = window.location.href.split('?')[0].split('#')[0];
+    const params = new URLSearchParams({
+      client_id: GOOGLE_CLIENT_ID,
+      redirect_uri: redirectUri,
+      response_type: 'token',
+      scope: 'https://www.googleapis.com/auth/drive.file',
+      include_granted_scopes: 'true',
+      prompt: 'none'  // ללא הצגת חלון — שקט לחלוטין
+    });
+    window.location.href = 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
+  }
+}
 </script>
 </body>
 </html>
