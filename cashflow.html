@@ -586,11 +586,48 @@ function deleteItem(type, id) {
 function deleteDebtor(id) { if (!confirm('למחוק חייב זה?')) return; debtors=debtors.filter(x=>x.id!==id); render(); scheduleSave(); showToast('נמחק'); }
 function deleteFixed(id) { if (!confirm('למחוק הוצאה קבועה זו?')) return; fixedExp=fixedExp.filter(x=>x.id!==id); render(); scheduleSave(); showToast('נמחק'); }
 
+// ─── SILENT TOKEN REFRESH ─────────────────────────────────────
+function silentRefresh(onSuccess) {
+  // רענון token שקט דרך iframe — ללא מסך התחברות
+  const existing = document.getElementById('auth-iframe');
+  if (existing) existing.remove();
+  const redirectUri = window.location.href.split('?')[0].split('#')[0];
+  const params = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID,
+    redirect_uri: redirectUri,
+    response_type: 'token',
+    scope: 'https://www.googleapis.com/auth/drive.file',
+    include_granted_scopes: 'true',
+    prompt: 'none'
+  });
+  const iframe = document.createElement('iframe');
+  iframe.id = 'auth-iframe';
+  iframe.style.display = 'none';
+  iframe.src = 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
+  iframe.onload = () => {
+    try {
+      const h = iframe.contentWindow.location.hash;
+      if (h && h.includes('access_token')) {
+        const p = new URLSearchParams(h.substring(1));
+        accessToken = p.get('access_token');
+        const exp = parseInt(p.get('expires_in') || '3600');
+        lsSave('cf_token_exp', Date.now() + exp * 1000);
+        iframe.remove();
+        if (onSuccess) onSuccess();
+      }
+    } catch(e) {
+      // cross-origin — silent refresh לא עובד, נמשיך מקומית
+      iframe.remove();
+    }
+  };
+  document.body.appendChild(iframe);
+}
+
 // ─── INIT ─────────────────────────────────────────────────────
 window.addEventListener('load', () => {
   const hash = window.location.hash;
 
-  // 1. חזרה מ-Google עם token חדש
+  // חזרה מ-Google עם token חדש
   if (hash && hash.includes('access_token')) {
     const params = new URLSearchParams(hash.substring(1));
     accessToken = params.get('access_token');
@@ -599,51 +636,57 @@ window.addEventListener('load', () => {
     lsSave('cf_authed', '1');
     history.replaceState(null, '', window.location.pathname);
     loadLocal(); render(); showApp();
-    loadFromDrive(); // סנכרן עם Drive ברקע
+    loadFromDrive();
     return;
   }
 
-  // 2. שגיאה מ-Google
   if (hash && hash.includes('error')) {
     history.replaceState(null, '', window.location.pathname);
   }
 
-  // 3. המשתמש כבר התחבר בעבר — פתח מיד ללא שאלות
   const everAuthed = lsLoad('cf_authed', null);
   if (everAuthed) {
+    // פתח מיד מהנתונים המקומיים
     loadLocal(); render(); showApp();
-    setSyncStatus('local');
-    // נסה לסנכרן בשקט אם יש token תקף
+    // נסה לסנכרן עם Drive — רענן token אם צריך
     const tokenExp = lsLoad('cf_token_exp', 0);
-    if (accessToken || (tokenExp && Date.now() < tokenExp - 60000)) {
+    if (tokenExp && Date.now() < tokenExp - 60000) {
+      // token עדיין תקף
       loadFromDrive();
     } else {
-      // Token פג — סנכרן בפעם הבאה שהמשתמש ילחץ "סנכרן"
-      setSyncStatus('local');
+      // token פג — רענן ואז סנכרן
+      silentRefresh(() => loadFromDrive());
     }
     return;
   }
 
-  // 4. כניסה ראשונה — הצג מסך התחברות
+  // כניסה ראשונה בלבד
 });
 
-// כפתור סנכרן — אם token פג, שלח להתחבר מחדש
 function manualSync() {
   const tokenExp = lsLoad('cf_token_exp', 0);
-  if (accessToken || (tokenExp && Date.now() < tokenExp - 60000)) {
+  if (accessToken) {
+    loadFromDrive();
+  } else if (tokenExp && Date.now() < tokenExp - 60000) {
     loadFromDrive();
   } else {
-    // Token פג — רענן בשקט
-    const redirectUri = window.location.href.split('?')[0].split('#')[0];
-    const params = new URLSearchParams({
-      client_id: GOOGLE_CLIENT_ID,
-      redirect_uri: redirectUri,
-      response_type: 'token',
-      scope: 'https://www.googleapis.com/auth/drive.file',
-      include_granted_scopes: 'true',
-      prompt: 'none'  // ללא הצגת חלון — שקט לחלוטין
-    });
-    window.location.href = 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
+    showToast('מתחבר מחדש...');
+    silentRefresh(() => loadFromDrive());
+    // אם silent לא עובד אחרי 3 שניות — redirect
+    setTimeout(() => {
+      if (!accessToken) {
+        const redirectUri = window.location.href.split('?')[0].split('#')[0];
+        const params = new URLSearchParams({
+          client_id: GOOGLE_CLIENT_ID,
+          redirect_uri: redirectUri,
+          response_type: 'token',
+          scope: 'https://www.googleapis.com/auth/drive.file',
+          include_granted_scopes: 'true',
+          prompt: 'none'
+        });
+        window.location.href = 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
+      }
+    }, 3000);
   }
 }
 </script>
