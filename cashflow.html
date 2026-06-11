@@ -646,16 +646,31 @@ window.addEventListener('load', () => {
 
   const everAuthed = lsLoad('cf_authed', null);
   if (everAuthed) {
-    // פתח מיד מהנתונים המקומיים
-    loadLocal(); render(); showApp();
-    // נסה לסנכרן עם Drive — רענן token אם צריך
     const tokenExp = lsLoad('cf_token_exp', 0);
-    if (tokenExp && Date.now() < tokenExp - 60000) {
-      // token עדיין תקף
+    const tokenValid = tokenExp && Date.now() < tokenExp - 60000;
+
+    if (tokenValid) {
+      // token תקף — פתח מיד וסנכרן
+      loadLocal(); render(); showApp();
       loadFromDrive();
     } else {
-      // token פג — רענן ואז סנכרן
-      silentRefresh(() => loadFromDrive());
+      // token פג — שמור שאנחנו באמצע רענון, פתח מיד מקומית ועשה redirect שקט
+      lsSave('cf_refreshing', '1');
+      loadLocal(); render(); showApp();
+      setSyncStatus('syncing');
+      // redirect שקט — Google יחזיר token ויחזור לאפליקציה תוך שנייה
+      setTimeout(() => {
+        const redirectUri = window.location.href.split('?')[0].split('#')[0];
+        const params = new URLSearchParams({
+          client_id: GOOGLE_CLIENT_ID,
+          redirect_uri: redirectUri,
+          response_type: 'token',
+          scope: 'https://www.googleapis.com/auth/drive.file',
+          include_granted_scopes: 'true',
+          prompt: 'none'
+        });
+        window.location.href = 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
+      }, 800);
     }
     return;
   }
